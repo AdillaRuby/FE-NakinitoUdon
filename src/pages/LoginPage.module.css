@@ -1,0 +1,221 @@
+.page {
+  display: flex;
+  min-height: 100vh;
+  background: var(--white);
+}
+
+/* Left */
+.left {
+  flex: 1;
+  background: var(--blue);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.brandContent {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: var(--white);
+  padding: 40px;
+}
+.logoWrap {
+  width: 80px;
+  height: 80px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.logoEmoji {
+  font-size: 40px;
+}
+.brandName {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.brandTagline {
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 40px;
+}
+.brandFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  max-width: 220px;
+  margin: 0 auto;
+}
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Right */
+.right {
+  width: 440px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  background: var(--white);
+}
+.formCard {
+  width: 100%;
+  max-width: 360px;
+}
+.formHeader {
+  margin-bottom: 32px;
+}
+.formTitle {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 6px;
+}
+.formSubtitle {
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+/* Form */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+.inputWrap {
+  display: flex;
+  align-items: center;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 0 14px;
+  gap: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--white);
+}
+.inputWrap:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(13,71,161,0.08);
+}
+.inputIcon {
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+.input {
+  flex: 1;
+  border: none;
+  padding: 13px 0;
+  font-size: 14px;
+  color: var(--gray-900);
+  background: transparent;
+}
+.input::placeholder { color: var(--gray-400); }
+.eyeBtn {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.eyeBtn:hover { color: var(--gray-600); }
+
+/* Error */
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFEBEE;
+  color: var(--red);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Login Button */
+.loginBtn {
+  width: 100%;
+  background: var(--blue);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(13,71,161,0.3);
+  margin-top: 4px;
+}
+.loginBtn:hover { background: var(--blue-light); }
+.loginBtn:active { background: var(--blue-dark); }
+.loginBtn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* Spinner */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: var(--white);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .page { flex-direction: column; }
+  .left {
+    min-height: 280px;
+    flex: none;
+  }
+  .brandFeatures { display: none; }
+  .right {
+    width: 100%;
+    padding: 32px 24px;
+  }
+}
