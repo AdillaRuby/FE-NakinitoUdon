@@ -203,7 +203,61 @@
 
 /* Main */
 .main {
-  padding: 16px;
+  padding: 0;
+}
+
+/* Menu Section - Separated Categories */
+.menuSection {
+  padding: 24px 16px;
+  border-bottom: 8px solid #f5f7fa;
+}
+
+.menuSection:last-child {
+  border-bottom: none;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 3px solid var(--blue);
+  position: relative;
+}
+
+.sectionHeader::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: var(--blue);
+  box-shadow: 0 2px 8px rgba(13, 71, 161, 0.3);
+}
+
+.sectionHeader svg {
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--gray-900);
+  margin: 0;
+  flex: 1;
+  letter-spacing: -0.5px;
+}
+
+.sectionCount {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-500);
+  background: var(--gray-100);
+  padding: 4px 12px;
+  border-radius: 12px;
 }
 
 /* Loading skeleton */

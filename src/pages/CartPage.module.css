@@ -103,6 +103,41 @@
   background: var(--gray-200);
 }
 
+/* Name Input Section */
+.nameSection {
+  margin: 12px 16px;
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border: 1px solid var(--gray-200);
+}
+.nameLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+.required {
+  color: var(--red);
+}
+.nameInput {
+  width: 100%;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--gray-900);
+  transition: border-color 0.2s;
+}
+.nameInput:focus {
+  border-color: var(--blue);
+  outline: none;
+}
+.nameInput::placeholder {
+  color: var(--gray-400);
+}
+
 /* Item List */
 .itemList {
   padding: 0 16px;

@@ -22,11 +22,11 @@ export default function CartPage() {
   const navigate = useNavigate()
   const [cart, setCart] = useState(loadCart)
   const [notes, setNotes] = useState('')
+  const [customerName, setCustomerName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const tableNumber = localStorage.getItem('tableNumber') || '1'
-  const customerName = localStorage.getItem('customerName') || 'Customer'
 
   useEffect(() => { saveCart(cart) }, [cart])
 
@@ -55,17 +55,31 @@ export default function CartPage() {
 
   async function handleOrder() {
     if (cart.length === 0) return
+    if (!customerName.trim()) {
+      setError('Nama customer wajib diisi')
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const formData = new FormData()
       formData.append('table_number', tableNumber)
-      formData.append('customer_name', customerName)
+      formData.append('customer_name', customerName.trim())
       formData.append('notes', notes)
+      formData.append('status', 'unpaid') // PENTING: Order belum dibayar
       formData.append('items', JSON.stringify(cart.map(i => ({ menu_id: i.menu_id, quantity: i.quantity }))))
 
       const res = await api.post('/orders', formData)
       const orderId = res.data.data?.id || res.data.data?.order_id
+
+      // Simpan order details untuk OrderPage (karena backend mungkin tidak return items)
+      localStorage.setItem('lastOrder', JSON.stringify({
+        id: orderId,
+        items: cart,
+        subtotal: totalPrice,
+        ppn: ppn,
+        total: grandTotal
+      }))
 
       // Bersihkan cart setelah order berhasil
       localStorage.removeItem('cart')
@@ -107,11 +121,20 @@ export default function CartPage() {
               <span className={styles.infoLabel}>Meja</span>
               <span className={styles.infoValue}>{tableNumber}</span>
             </div>
-            <div className={styles.infoDivider} />
-            <div className={styles.infoItem}>
-              <span className={styles.infoLabel}>Nama</span>
-              <span className={styles.infoValue}>{customerName}</span>
-            </div>
+          </div>
+
+          {/* Customer Name Input */}
+          <div className={styles.nameSection}>
+            <label className={styles.nameLabel}>
+              Nama Customer <span className={styles.required}>*</span>
+            </label>
+            <input
+              type="text"
+              className={styles.nameInput}
+              placeholder="Masukkan nama Anda..."
+              value={customerName}
+              onChange={e => { setCustomerName(e.target.value); setError('') }}
+            />
           </div>
 
           {/* Cart Items */}

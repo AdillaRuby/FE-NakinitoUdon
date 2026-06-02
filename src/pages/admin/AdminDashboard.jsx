@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+  import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../lib/api'
 import styles from './AdminDashboard.module.css'
@@ -59,24 +59,33 @@ export default function AdminDashboard() {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const res = await api.get('/orders', { params: { page, limit: 20 } })
+      const res = await api.get('/orders', { params: { page, limit: 100 } })
+      
       const data = res.data.data
       const list = Array.isArray(data) ? data : (data?.orders || data?.data || [])
       const meta = data?.meta || data?.pagination || {}
 
-      setOrders(list)
+      // Filter hanya order yang sudah paid (bukan unpaid)
+      const paidOrders = list.filter(o => o.status !== 'unpaid')
+
+      setOrders(paidOrders)
       setTotalPages(meta.totalPages || meta.total_pages || 1)
 
-      const pending = list.filter(o => o.status !== 'delivered').length
-      const done = list.filter(o => o.status === 'delivered').length
-      const today = list.filter(o => {
+      // Stats calculation
+      // Pesanan Baru = semua yang bukan delivered (pending, paid, dll)
+      const pending = paidOrders.filter(o => o.status !== 'delivered').length
+      const done = paidOrders.filter(o => o.status === 'delivered').length
+      
+      const today = paidOrders.filter(o => {
+        if (!o.created_at) return false
         const d = new Date(o.created_at)
         const now = new Date()
         return d.toDateString() === now.toDateString()
       }).length
-      const revenue = list
+      
+      const revenue = paidOrders
         .filter(o => o.status === 'delivered')
-        .reduce((s, o) => s + (o.total_price || 0), 0)
+        .reduce((s, o) => s + (Number(o.total_price) || 0), 0)
 
       setStats({ pending, done, today, revenue })
     } catch (err) {
@@ -152,26 +161,53 @@ export default function AdminDashboard() {
       setError('Nama dan harga wajib diisi')
       return
     }
+    
+    if (!menuForm.image && !editingMenu) {
+      setError('Gambar wajib diupload!')
+      return
+    }
+    
     setSaving(true)
     setError('')
     try {
       const formData = new FormData()
-      formData.append('name', menuForm.name)
-      formData.append('description', menuForm.description)
-      formData.append('price', menuForm.price)
-      formData.append('stock', menuForm.stock || 0)
-      formData.append('category_id', menuForm.category_id)
-      if (menuForm.image) formData.append('image', menuForm.image)
+      formData.append('name', menuForm.name.trim())
+      formData.append('description', menuForm.description.trim() || '')
+      formData.append('price', Number(menuForm.price))           // CONVERT KE NUMBER!
+      formData.append('stock', Number(menuForm.stock) || 10)     // CONVERT KE NUMBER!
+      formData.append('category_id', Number(menuForm.category_id)) // CONVERT KE NUMBER!
+      formData.append('status', 'available')
+      
+      if (menuForm.image) {
+        formData.append('image', menuForm.image)
+      }
 
       if (editingMenu) {
-        await api.put(`/menus/${editingMenu.id}`, formData)
+        await api.put(`/menus/${editingMenu.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
       } else {
-        await api.post('/menus', formData)
+        await api.post('/menus', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
       }
+      
       setShowMenuModal(false)
       fetchMenus()
+      alert('Menu berhasil disimpan!')
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan menu')
+      console.error('Save menu error:', err.response?.data)
+      const errorData = err.response?.data
+      let errorMsg = 'Gagal menyimpan menu'
+      
+      if (errorData?.message) {
+        errorMsg = errorData.message
+      } else if (errorData?.data) {
+        errorMsg = JSON.stringify(errorData.data)
+      }
+      
+      setError(errorMsg)
+      alert(`GAGAL!\n\n${errorMsg}`)
     } finally {
       setSaving(false)
     }
@@ -289,7 +325,11 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarBrand}>
-          <span className={styles.sidebarEmoji}>🍜</span>
+          <span className={styles.sidebarEmoji}>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
+          </span>
           <div>
             <p className={styles.sidebarName}>Nakinito Udon</p>
             <p className={styles.sidebarRole}>Admin Panel</p>
@@ -348,28 +388,44 @@ export default function AdminDashboard() {
             {/* Stats */}
             <div className={styles.statsGrid}>
               <div className={`${styles.statCard} ${styles.statBlue}`}>
-                <div className={styles.statIcon}>⏳</div>
+                <div className={styles.statIcon}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/>
+                  </svg>
+                </div>
                 <div>
                   <p className={styles.statValue}>{stats.pending}</p>
                   <p className={styles.statLabel}>Pesanan Baru</p>
                 </div>
               </div>
               <div className={`${styles.statCard} ${styles.statGreen}`}>
-                <div className={styles.statIcon}>✅</div>
+                <div className={styles.statIcon}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                  </svg>
+                </div>
                 <div>
                   <p className={styles.statValue}>{stats.done}</p>
                   <p className={styles.statLabel}>Sudah Diantar</p>
                 </div>
               </div>
               <div className={`${styles.statCard} ${styles.statOrange}`}>
-                <div className={styles.statIcon}>📅</div>
+                <div className={styles.statIcon}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zm0-12H5V5h14v2zM7 11h5v5H7z"/>
+                  </svg>
+                </div>
                 <div>
                   <p className={styles.statValue}>{stats.today}</p>
                   <p className={styles.statLabel}>Pesanan Hari Ini</p>
                 </div>
               </div>
               <div className={`${styles.statCard} ${styles.statYellow}`}>
-                <div className={styles.statIcon}>💰</div>
+                <div className={styles.statIcon}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                  </svg>
+                </div>
                 <div>
                   <p className={styles.statValue}>{formatPrice(stats.revenue)}</p>
                   <p className={styles.statLabel}>Pendapatan</p>
@@ -434,7 +490,9 @@ export default function AdminDashboard() {
                 </div>
               ) : filtered.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <span className={styles.emptyIcon}>{activeTab === 'pending' ? '🎉' : '📭'}</span>
+                  <svg className={styles.emptyIcon} viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
                   <p>{activeTab === 'pending' ? 'Tidak ada pesanan baru' : 'Belum ada pesanan yang sudah diantar'}</p>
                 </div>
               ) : (
@@ -459,7 +517,7 @@ export default function AdminDashboard() {
                         <td className={styles.tdTotal}>{formatPrice(order.total_price)}</td>
                         <td>
                           <span className={`${styles.statusBadge} ${order.status === 'delivered' ? styles.badgeDone : styles.badgePending}`}>
-                            {order.status === 'delivered' ? '✅ Sudah Diantar' : '⏳ Pesanan Baru'}
+                            {order.status === 'delivered' ? 'Sudah Diantar' : order.status === 'paid' ? 'Sudah Bayar' : 'Pesanan Baru'}
                           </span>
                         </td>
                         <td className={styles.tdTime}>{formatDate(order.created_at)}</td>
@@ -656,80 +714,147 @@ export default function AdminDashboard() {
       {/* Order Detail/Edit Modal */}
       {showOrderModal && selectedOrder && (
         <div className={styles.modalOverlay} onClick={() => setShowOrderModal(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>Detail Pesanan #{selectedOrder.id}</h2>
-              <button className={styles.modalClose} onClick={() => setShowOrderModal(false)}>✕</button>
+          <div className={`${styles.modal} ${styles.modalLarge}`} onClick={e => e.stopPropagation()}>
+            {/* Header dengan gradient */}
+            <div className={styles.modalHeaderDetail}>
+              <div className={styles.modalHeaderContent}>
+                <div className={styles.modalHeaderTop}>
+                  <div>
+                    <span className={styles.modalOrderId}>Pesanan #{selectedOrder.id}</span>
+                    <h2 className={styles.modalOrderName}>{selectedOrder.customer_name}</h2>
+                  </div>
+                  <button className={styles.modalCloseDetail} onClick={() => setShowOrderModal(false)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+                <div className={styles.modalHeaderBadges}>
+                  <div className={styles.modalBadge}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                      <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                    Meja {selectedOrder.table_number}
+                  </div>
+                  <span className={`${styles.statusBadge} ${selectedOrder.status === 'delivered' ? styles.badgeDone : styles.badgePending}`}>
+                    {selectedOrder.status === 'delivered' ? 'Sudah Diantar' : selectedOrder.status === 'paid' ? 'Sudah Bayar' : 'Pesanan Baru'}
+                  </span>
+                </div>
+              </div>
             </div>
+
             <div className={styles.modalBody}>
               {/* Order Info */}
-              <div className={styles.orderInfoSection}>
-                <div className={styles.formGroup}>
-                  <label>Nama Customer</label>
-                  {editingOrder ? (
-                    <input
-                      type="text"
-                      value={orderForm.customer_name}
-                      onChange={e => setOrderForm(prev => ({ ...prev, customer_name: e.target.value }))}
-                    />
-                  ) : (
-                    <div className={styles.infoValue}>{selectedOrder.customer_name}</div>
-                  )}
-                </div>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label>Nomor Meja</label>
-                    {editingOrder ? (
+              {editingOrder ? (
+                <div className={styles.editSection}>
+                  <div className={styles.sectionHeader}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    <h3 className={styles.sectionTitle}>Edit Informasi</h3>
+                  </div>
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Nama Customer</label>
+                      <input
+                        type="text"
+                        value={orderForm.customer_name}
+                        onChange={e => setOrderForm(prev => ({ ...prev, customer_name: e.target.value }))}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Nomor Meja</label>
                       <input
                         type="text"
                         value={orderForm.table_number}
                         onChange={e => setOrderForm(prev => ({ ...prev, table_number: e.target.value }))}
                       />
-                    ) : (
-                      <div className={styles.infoValue}>Meja {selectedOrder.table_number}</div>
-                    )}
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label>Status</label>
-                    <div className={styles.infoValue}>
-                      <span className={`${styles.statusBadge} ${selectedOrder.status === 'delivered' ? styles.badgeDone : styles.badgePending}`}>
-                        {selectedOrder.status === 'delivered' ? '✅ Sudah Diantar' : '⏳ Pesanan Baru'}
-                      </span>
                     </div>
                   </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Catatan</label>
-                  {editingOrder ? (
+                  <div className={styles.formGroup}>
+                    <label>Catatan</label>
                     <textarea
                       value={orderForm.notes}
                       onChange={e => setOrderForm(prev => ({ ...prev, notes: e.target.value }))}
                       rows={2}
                     />
-                  ) : (
-                    <div className={styles.infoValue}>{selectedOrder.notes || '-'}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.infoGrid}>
+                  <div className={styles.infoCard}>
+                    <div className={styles.infoCardIcon}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className={styles.infoCardLabel}>Customer</div>
+                      <div className={styles.infoCardValue}>{selectedOrder.customer_name}</div>
+                    </div>
+                  </div>
+                  <div className={styles.infoCard}>
+                    <div className={styles.infoCardIcon}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className={styles.infoCardLabel}>Waktu</div>
+                      <div className={styles.infoCardValue}>{formatDate(selectedOrder.created_at)}</div>
+                    </div>
+                  </div>
+                  {selectedOrder.notes && (
+                    <div className={`${styles.infoCard} ${styles.infoCardFull}`}>
+                      <div className={styles.infoCardIcon}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                          <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className={styles.infoCardLabel}>Catatan</div>
+                        <div className={styles.infoCardValue}>{selectedOrder.notes}</div>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className={styles.formGroup}>
-                  <label>Waktu Pesanan</label>
-                  <div className={styles.infoValue}>{formatDate(selectedOrder.created_at)}</div>
-                </div>
-              </div>
+              )}
 
               {/* Order Items */}
-              <div className={styles.itemsSection}>
-                <h3 className={styles.sectionTitle}>Item Pesanan</h3>
+              <div className={styles.itemsSectionDetail}>
+                <div className={styles.sectionHeader}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                    <circle cx="9" cy="21" r="1" />
+                    <circle cx="20" cy="21" r="1" />
+                    <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+                  </svg>
+                  <h3 className={styles.sectionTitle}>Item Pesanan ({orderItems.length})</h3>
+                </div>
                 {orderItems.length === 0 ? (
                   <p className={styles.emptyText}>Tidak ada item</p>
                 ) : (
-                  <div className={styles.itemsList}>
+                  <div className={styles.itemsListDetail}>
                     {orderItems.map((item, idx) => (
-                      <div key={idx} className={styles.orderItem}>
-                        <div className={styles.orderItemInfo}>
-                          <span className={styles.orderItemName}>{item.menu_name || item.name}</span>
-                          <span className={styles.orderItemQty}>x{item.quantity}</span>
+                      <div key={idx} className={styles.orderItemDetail}>
+                        <div className={styles.orderItemLeft}>
+                          <div className={styles.orderItemIndex}>{idx + 1}</div>
+                          <div>
+                            <div className={styles.orderItemName}>{item.menu_name || item.name}</div>
+                            <div className={styles.orderItemMeta}>
+                              {formatPrice(item.price)} × {item.quantity}
+                            </div>
+                          </div>
                         </div>
-                        <span className={styles.orderItemPrice}>{formatPrice(item.price * item.quantity)}</span>
+                        <div className={styles.orderItemPrice}>{formatPrice(item.price * item.quantity)}</div>
                       </div>
                     ))}
                   </div>
@@ -737,26 +862,40 @@ export default function AdminDashboard() {
               </div>
 
               {/* Total */}
-              <div className={styles.totalSection}>
-                <div className={styles.totalRow}>
-                  <span className={styles.totalLabel}>Total</span>
-                  <span className={styles.totalValue}>{formatPrice(selectedOrder.total_price)}</span>
+              <div className={styles.totalSectionDetail}>
+                <div className={styles.totalRowDetail}>
+                  <span className={styles.totalLabelDetail}>Total Pembayaran</span>
+                  <span className={styles.totalValueDetail}>{formatPrice(selectedOrder.total_price)}</span>
                 </div>
               </div>
             </div>
+
             <div className={styles.modalFooter}>
               {editingOrder ? (
                 <>
-                  <button className={styles.cancelBtn} onClick={() => setEditingOrder(false)}>Batal</button>
+                  <button className={styles.cancelBtn} onClick={() => setEditingOrder(false)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                    Batal
+                  </button>
                   <button className={styles.saveBtn} onClick={handleUpdateOrder} disabled={savingOrder}>
-                    {savingOrder ? 'Menyimpan...' : 'Simpan'}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {savingOrder ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
                 </>
               ) : (
                 <>
                   <button className={styles.cancelBtn} onClick={() => setShowOrderModal(false)}>Tutup</button>
-                  {o.status !== 'delivered' && (
+                  {selectedOrder.status !== 'delivered' && (
                     <button className={styles.editOrderBtn} onClick={enableEditOrder}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
                       Edit Pesanan
                     </button>
                   )}

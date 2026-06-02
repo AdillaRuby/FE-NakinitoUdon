@@ -26,19 +26,8 @@ export default function MenuPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [cart, setCart] = useState(loadCart)
-  const [customerName, setCustomerName] = useState(() => localStorage.getItem('customerName') || '')
-  const [showNameModal, setShowNameModal] = useState(false)
-  const [nameInput, setNameInput] = useState('')
-  const [nameError, setNameError] = useState('')
   const [selectedMenu, setSelectedMenu] = useState(null)
   const [currentBanner, setCurrentBanner] = useState(0)
-  const [selectedCategory, setSelectedCategory] = useState('all')
-
-  const categories = [
-    { id: 'all', name: 'Semua' },
-    { id: 1, name: 'Makanan' },
-    { id: 2, name: 'Minuman' },
-  ]
 
   const banners = [
     { id: 1, image: '/pb1.png', title: 'Promo 1' },
@@ -53,34 +42,18 @@ export default function MenuPage() {
     }, 3000)
     return () => clearInterval(timer)
   }, [banners.length])
-  const [toast, setToast] = useState(null)
-
-  function showToast(message, type = 'success') {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 2000)
-  }
-
-  // Tampilkan modal nama jika belum ada
-  useEffect(() => {
-    if (!customerName) setShowNameModal(true)
-  }, [customerName])
 
   const fetchMenus = useCallback(async () => {
     setLoading(true)
     try {
       const res = await api.get('/menus', { params: { name: search } })
-      const allMenus = res.data.data || []
-      // Filter by category
-      const filtered = selectedCategory === 'all' 
-        ? allMenus 
-        : allMenus.filter(m => m.category_id === selectedCategory)
-      setMenus(filtered)
+      setMenus(res.data.data || [])
     } catch {
       setMenus([])
     } finally {
       setLoading(false)
     }
-  }, [search, selectedCategory])
+  }, [search])
 
   useEffect(() => {
     const timer = setTimeout(fetchMenus, 300)
@@ -90,13 +63,9 @@ export default function MenuPage() {
   // Simpan cart ke localStorage setiap berubah
   useEffect(() => { saveCart(cart) }, [cart])
 
-  function handleSaveName() {
-    if (!nameInput.trim()) { setNameError('Nama tidak boleh kosong'); return }
-    localStorage.setItem('customerName', nameInput.trim())
-    setCustomerName(nameInput.trim())
-    setShowNameModal(false)
-    setNameError('')
-  }
+  // Separate menus by category
+  const makananMenus = menus.filter(m => m.category_id === 1)
+  const minumanMenus = menus.filter(m => m.category_id === 2)
 
   function getQty(menuId) {
     return cart.find(i => i.menu_id === menuId)?.quantity || 0
@@ -147,12 +116,6 @@ export default function MenuPage() {
               <p className={styles.tableInfo}>Meja {tableNumber}</p>
             </div>
           </div>
-          {customerName && (
-            <div className={styles.customerBadge}>
-              <span>👤</span>
-              <span>{customerName}</span>
-            </div>
-          )}
         </div>
       </header>
 
@@ -178,7 +141,7 @@ export default function MenuPage() {
       {/* Banner Carousel */}
       <div className={styles.bannerWrap}>
         <div className={styles.bannerCarousel} style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
-          {banners.map((banner, idx) => (
+          {banners.map((banner) => (
             <div key={banner.id} className={styles.bannerSlide}>
               <img src={banner.image} alt={banner.title} />
             </div>
@@ -195,20 +158,7 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div className={styles.categoryWrap}>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            className={`${styles.categoryBtn} ${selectedCategory === cat.id ? styles.categoryActive : ''}`}
-            onClick={() => setSelectedCategory(cat.id)}
-          >
-            {cat.name}
-          </button>
-        ))}
-      </div>
-
-      {/* Menu List */}
+      {/* Menu List - Separated by Category */}
       <main className={styles.main}>
         {loading ? (
           <div className={styles.loadingWrap}>
@@ -216,47 +166,67 @@ export default function MenuPage() {
           </div>
         ) : menus.length === 0 ? (
           <div className={styles.empty}>
-            <span className={styles.emptyIcon}>🍽️</span>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64" opacity="0.3">
+              <path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/>
+            </svg>
             <p>Menu tidak ditemukan</p>
           </div>
         ) : (
-          <div className={styles.menuGrid}>
-            {menus.map(menu => {
-              const qty = getQty(menu.id)
-              return (
-                <div key={menu.id} className={styles.menuCard}>
-                  <div className={styles.menuImgWrap} onClick={() => setSelectedMenu(menu)}>
-                    <img
-                      src={getImageUrl(menu.image)}
-                      alt={menu.name}
-                      className={styles.menuImg}
-                      onError={e => { e.target.src = 'https://placehold.co/300x200/e0e0e0/9e9e9e?text=No+Image' }}
-                    />
-                  </div>
-                  <div className={styles.menuInfo}>
-                    <h3 className={styles.menuName} onClick={() => setSelectedMenu(menu)}>{menu.name}</h3>
-                    {menu.description && (
-                      <p className={styles.menuDesc}>{menu.description}</p>
-                    )}
-                    <p className={styles.menuPrice}>{formatPrice(menu.price)}</p>
-                  </div>
-                  <div className={styles.menuAction}>
-                    {qty === 0 ? (
-                      <button className={styles.addBtn} onClick={() => addItem(menu)}>
-                        +
-                      </button>
-                    ) : (
-                      <div className={styles.qtyControl}>
-                        <button className={styles.qtyBtn} onClick={() => removeItem(menu.id)}>−</button>
-                        <span className={styles.qtyNum}>{qty}</span>
-                        <button className={styles.qtyBtn} onClick={() => addItem(menu)}>+</button>
-                      </div>
-                    )}
-                  </div>
+          <>
+            {/* Section Makanan */}
+            {makananMenus.length > 0 && (
+              <section className={styles.menuSection}>
+                <div className={styles.sectionHeader}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/>
+                  </svg>
+                  <h2 className={styles.sectionTitle}>Makanan</h2>
+                  <span className={styles.sectionCount}>{makananMenus.length} menu</span>
                 </div>
-              )
-            })}
-          </div>
+                <div className={styles.menuGrid}>
+                  {makananMenus.map(menu => (
+                    <MenuCard
+                      key={menu.id}
+                      menu={menu}
+                      qty={getQty(menu.id)}
+                      onAdd={addItem}
+                      onRemove={removeItem}
+                      onDetail={setSelectedMenu}
+                      formatPrice={formatPrice}
+                      getImageUrl={getImageUrl}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Section Minuman */}
+            {minumanMenus.length > 0 && (
+              <section className={styles.menuSection}>
+                <div className={styles.sectionHeader}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M2 21h18v-2H2v2zM20 8h-3V4c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v4H4c-1.1 0-2 .9-2 2v8h20v-8c0-1.1-.9-2-2-2zm-11-3h6v3H9V5z"/>
+                  </svg>
+                  <h2 className={styles.sectionTitle}>Minuman</h2>
+                  <span className={styles.sectionCount}>{minumanMenus.length} menu</span>
+                </div>
+                <div className={styles.menuGrid}>
+                  {minumanMenus.map(menu => (
+                    <MenuCard
+                      key={menu.id}
+                      menu={menu}
+                      qty={getQty(menu.id)}
+                      onAdd={addItem}
+                      onRemove={removeItem}
+                      onDetail={setSelectedMenu}
+                      formatPrice={formatPrice}
+                      getImageUrl={getImageUrl}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
       </main>
 
@@ -268,30 +238,6 @@ export default function MenuPage() {
             <span className={styles.cartLabel}>Lihat Keranjang</span>
           </div>
           <span className={styles.cartTotal}>{formatPrice(totalPrice)}</span>
-        </div>
-      )}
-
-      {/* Modal Nama Customer */}
-      {showNameModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <div className={styles.modalIcon}>👋</div>
-            <h2 className={styles.modalTitle}>Halo! Siapa namamu?</h2>
-            <p className={styles.modalDesc}>Masukkan namamu agar pesanan mudah dikenali</p>
-            <input
-              className={`${styles.modalInput} ${nameError ? styles.inputError : ''}`}
-              type="text"
-              placeholder="Nama kamu..."
-              value={nameInput}
-              onChange={e => { setNameInput(e.target.value); setNameError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-              autoFocus
-            />
-            {nameError && <p className={styles.errorMsg}>{nameError}</p>}
-            <button className={styles.modalBtn} onClick={handleSaveName}>
-              Mulai Pesan 🍜
-            </button>
-          </div>
         </div>
       )}
 
@@ -337,6 +283,44 @@ export default function MenuPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// MenuCard Component
+function MenuCard({ menu, qty, onAdd, onRemove, onDetail, formatPrice, getImageUrl }) {
+  return (
+    <div className={styles.menuCard}>
+      <div className={styles.menuImgWrap} onClick={() => onDetail(menu)}>
+        <img
+          src={getImageUrl(menu.image)}
+          alt={menu.name}
+          className={styles.menuImg}
+          onError={e => { e.target.src = 'https://placehold.co/300x200/e0e0e0/9e9e9e?text=No+Image' }}
+        />
+      </div>
+      <div className={styles.menuInfo}>
+        <h3 className={styles.menuName} onClick={() => onDetail(menu)}>{menu.name}</h3>
+        {menu.description && (
+          <p className={styles.menuDesc}>{menu.description}</p>
+        )}
+        <p className={styles.menuPrice}>{formatPrice(menu.price)}</p>
+      </div>
+      <div className={styles.menuAction}>
+        {qty === 0 ? (
+          <button className={styles.addBtn} onClick={() => onAdd(menu)}>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
+          </button>
+        ) : (
+          <div className={styles.qtyControl}>
+            <button className={styles.qtyBtn} onClick={() => onRemove(menu.id)}>−</button>
+            <span className={styles.qtyNum}>{qty}</span>
+            <button className={styles.qtyBtn} onClick={() => onAdd(menu)}>+</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
